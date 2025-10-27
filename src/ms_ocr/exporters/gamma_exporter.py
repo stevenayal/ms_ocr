@@ -95,53 +95,99 @@ class GammaExporter:
         subtitle = self._detect_subtitle(elements)
         slides.append(create_cover_slide(title, subtitle, self.brand.logo))
 
-        # Group elements into slides
+        # Group elements into slides - MORE AGGRESSIVE APPROACH
         current_section = None
         current_bullets = []
+        current_paragraphs = []
         current_title = None
+        slide_counter = 0
+        max_bullets_per_slide = 6
+        max_paragraphs_per_slide = 3
 
-        for element in elements:
-            if element.type == "heading":
-                # Flush previous bullets
-                if current_bullets and current_title:
-                    slides.append(create_bullets_slide(current_title, current_bullets))
+        for i, element in enumerate(elements):
+            if element.type == "title":
+                # Skip main title (already in cover)
+                continue
+
+            elif element.type == "heading":
+                # Flush previous content
+                if current_bullets or current_paragraphs:
+                    if current_title:
+                        if current_bullets:
+                            # Create bullet slide
+                            slides.append(create_bullets_slide(
+                                current_title,
+                                current_bullets[:max_bullets_per_slide],
+                                notes="\n".join(current_paragraphs) if current_paragraphs else None
+                            ))
+                        elif current_paragraphs:
+                            # Create content slide from paragraphs
+                            slides.append(create_bullets_slide(
+                                current_title,
+                                current_paragraphs[:max_paragraphs_per_slide]
+                            ))
                     current_bullets = []
+                    current_paragraphs = []
 
                 # Check heading level
                 if element.level == 1:
-                    # Major section
+                    # Major section divider
                     slides.append(create_section_slide(element.text))
                     current_section = element.text
                     current_title = None
-                else:
-                    # Subsection - becomes slide title
+                elif element.level <= 3:
+                    # Subsection - becomes new slide title
                     current_title = element.text
+                    slide_counter += 1
 
             elif element.type == "list_item":
-                # Add to current bullets
+                # Clean and add bullet
                 text = element.text.lstrip("•●○■□▪▫-*0123456789. \t")
-                current_bullets.append(text)
+                if text and len(text) > 2:
+                    current_bullets.append(text)
+
+                    # Auto-flush if too many bullets
+                    if len(current_bullets) >= max_bullets_per_slide:
+                        if current_title:
+                            slides.append(create_bullets_slide(
+                                current_title,
+                                current_bullets[:max_bullets_per_slide]
+                            ))
+                        current_bullets = []
 
             elif element.type == "paragraph":
-                # Flush bullets if any
-                if current_bullets and current_title:
-                    slides.append(create_bullets_slide(current_title, current_bullets))
-                    current_bullets = []
-                    current_title = None
+                text = element.text.strip()
+                if text and len(text) > 20:
+                    # Add meaningful paragraphs
+                    current_paragraphs.append(text)
 
-                # Paragraph becomes notes or new slide
-                # For simplicity, add as bullets slide with single item
-                if len(element.text) > 50:
-                    # Long paragraph - split or skip
-                    pass
+                    # Auto-flush if too many paragraphs
+                    if len(current_paragraphs) >= max_paragraphs_per_slide:
+                        if current_title:
+                            slides.append(create_bullets_slide(
+                                current_title,
+                                current_paragraphs[:max_paragraphs_per_slide]
+                            ))
+                        current_paragraphs = []
 
-        # Flush remaining bullets
-        if current_bullets and current_title:
-            slides.append(create_bullets_slide(current_title, current_bullets))
+        # Flush remaining content
+        if current_bullets or current_paragraphs:
+            if current_title:
+                if current_bullets:
+                    slides.append(create_bullets_slide(
+                        current_title,
+                        current_bullets[:max_bullets_per_slide],
+                        notes="\n".join(current_paragraphs) if current_paragraphs else None
+                    ))
+                elif current_paragraphs:
+                    slides.append(create_bullets_slide(
+                        current_title,
+                        current_paragraphs[:max_paragraphs_per_slide]
+                    ))
 
         # Add table slides
         for i, table in enumerate(tables):
-            table_title = f"Table {i + 1}"
+            table_title = f"Tabla {i + 1}"
             slides.append(create_table_slide(table_title, table.to_markdown()))
 
         return slides

@@ -5,6 +5,13 @@ from typing import List, Optional
 from ms_ocr.layout.rules import LayoutElement, LayoutRules
 from ms_ocr.readers.pdf_reader import PageInfo, TextBlock
 
+# Try to import layoutparser, but make it optional
+try:
+    import layoutparser as lp
+    LAYOUTPARSER_AVAILABLE = True
+except ImportError:
+    LAYOUTPARSER_AVAILABLE = False
+
 
 class LayoutDetector:
     """Detect layout elements in pages."""
@@ -18,10 +25,8 @@ class LayoutDetector:
         self.use_ml = use_ml
         self.rules = LayoutRules()
 
-        if use_ml:
+        if use_ml and LAYOUTPARSER_AVAILABLE:
             try:
-                import layoutparser as lp
-
                 # Load a pre-trained model (CPU version)
                 self.model = lp.Detectron2LayoutModel(
                     "lp://PubLayNet/faster_rcnn_R_50_FPN_3x/config",
@@ -33,6 +38,7 @@ class LayoutDetector:
                 self.use_ml = False
                 self.model = None
         else:
+            self.use_ml = False
             self.model = None
 
     def detect(

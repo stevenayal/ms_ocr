@@ -5,12 +5,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-import camelot
 import pandas as pd
-import tabula
 from PIL import Image
 
 from ms_ocr.utils.logger import get_logger
+
+# Try to import camelot, but make it optional
+try:
+    import camelot
+    CAMELOT_AVAILABLE = True
+except ImportError:
+    CAMELOT_AVAILABLE = False
+
+# Try to import tabula, but make it optional
+try:
+    import tabula
+    TABULA_AVAILABLE = True
+except ImportError:
+    TABULA_AVAILABLE = False
 
 logger = get_logger(__name__)
 
@@ -82,10 +94,10 @@ class TablesExtractor:
         # Convert to 1-indexed for camelot/tabula
         page_str = str(page_num + 1)
 
-        if self.method in ("auto", "camelot"):
+        if self.method in ("auto", "camelot") and CAMELOT_AVAILABLE:
             tables.extend(self._extract_camelot(pdf_path, page_str))
 
-        if self.method in ("auto", "tabula") and not tables:
+        if self.method in ("auto", "tabula") and not tables and TABULA_AVAILABLE:
             tables.extend(self._extract_tabula(pdf_path, page_str))
 
         # Filter by confidence
